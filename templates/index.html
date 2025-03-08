@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebRTC Phone Call</title>
+</head>
+<body>
+    <h1>WebRTC Phone Calling App</h1>
+    
+    <div id="local-video-container">
+        <video id="local-video" autoplay muted></video>
+    </div>
+
+    <div id="remote-video-container">
+        <video id="remote-video" autoplay></video>
+    </div>
+
+    <button id="start-call">Start Call</button>
+    <button id="hang-up">Hang Up</button>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.min.js"></script>
+    <script>
+        // Variables
+        const localVideo = document.getElementById("local-video");
+        const remoteVideo = document.getElementById("remote-video");
+        const startCallButton = document.getElementById("start-call");
+        const hangUpButton = document.getElementById("hang-up");
+
+        let localStream;
+        let peerConnection;
+        let socket;
+
+        const serverURL = "https://hackathon-16y2.onrender.com"; 
+        const room = "default_room"; // Room name
+
+        // Create WebSocket connection
+        socket = io(serverURL);
+
+        // Join the room
+        socket.emit('join', { room });
+
+        // Start the call
+        startCallButton.onclick = () => {
+            startCall();
+        };
+
+        async function startCall() {
+            // Get local media stream
+            localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            localVideo.srcObject = localStream;
+
+            // Create a new RTCPeerConnection
+            peerConnection = new RTCPeerConnection();
+
+            // Add local stream tracks to the peer connection
+            localStream.getTracks().forEach(track => {
+                peerConnection.addTrack(track, localStream);
+            });
+
+            // Handle ICE candidates
+            peerConnection.onicecandidate = event => {
+                if (event.candidate) {
+                    socket.emit('ice-candidate', { candidate: event.candidate, room });
+                }
+            };
+
+            // Handle remote stream
+            peerConnection.ontrack = event => {
+                remoteVideo.srcObject = event.streams[0];
+            };
+
+            // Create an offer
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+
+            // Send the offer to the server
+            socket.emit('offer', { offer, room });
+        }
+
+        // Handle incoming offer
+        socket.on('offer', async data => {
+            if (!peerConnection) {
+                startCall();
+            }
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+            const answer = await peerConnection.createAnswer();
+            await peerConnection.setLocalDescription(answer);
+            socket.emit('answer', { answer, room });
+        });
+
+        // Handle incoming answer
+        socket.on('answer', async data => {
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+        });
+
+        // Handle incoming ICE candidates
+        socket.on('ice-candidate', async data => {
+            try {
+                await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+            } catch (e) {
+                console.error('Error adding received ice candidate', e);
+            }
+        });
+    </script>
+</body>
+</html>
