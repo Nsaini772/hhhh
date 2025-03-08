@@ -1,9 +1,11 @@
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit, join_room, leave_room
 import logging
+from flask_cors import CORS
 
 app = Flask(__name__)
-socketio = SocketIO(app)
+CORS(app)  # Enable CORS for all routes
+socketio = SocketIO(app, cors_allowed_origins="*")  # Allow connections from any origin
 
 rooms = {}
 
@@ -59,4 +61,4 @@ def handle_ice_candidate(data):
 
 if __name__ == '__main__':
     logging.info('Starting server on 0.0.0.0:5000')
-    socketio.run(app, host='0.0.0.0', port=5000)
+    socketio.run(app, host='0.0.0.0', port=5000, debug=True)
