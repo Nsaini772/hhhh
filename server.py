@@ -1,10 +1,19 @@
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit, join_room, leave_room
 import logging
-from flask_cors import CORS
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes
+
+# Try to import CORS, but continue without it if not available
+try:
+    from flask_cors import CORS
+    CORS(app)  # Enable CORS for all routes
+    cors_available = True
+except ImportError:
+    logging.warning("flask_cors not available. CORS support disabled.")
+    cors_available = False
+
+# Configure socketio with appropriate CORS settings
 socketio = SocketIO(app, cors_allowed_origins="*")  # Allow connections from any origin
 
 rooms = {}
